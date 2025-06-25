@@ -3,12 +3,12 @@ const bcrypt = require('bcryptjs');
 
 class AlunoController{
     static async cadastrar(req, res){
-        const { matricula, nome, email, senha } = req.body;
-        if(!matricula || !nome || !email || !senha){
+        const { nome, matricula, email, senha } = req.body;
+        if(!nome || !matricula ||  !email || !senha){
             return res.status(400).json({msg: 'Todos os campos devem ser preenchidos'})
         }
         const senhaCriptografada = await bcrypt.hash(senha, 15);
-        await Aluno.create({ matricula, nome, email, senhaCriptografada })
+        await Aluno.create({ nome, matricula, email, senha: senhaCriptografada })
         res.status(200).json({msg: 'Aluno criado com sucesso!'})
     }
 

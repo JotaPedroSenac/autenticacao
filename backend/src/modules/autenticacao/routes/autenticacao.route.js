@@ -1,18 +1,15 @@
 const express = require('express');
-const { cadastrar } = require('../../aluno/controllers/aluno.controller')
-const router = express.Router()
+const router = express.Router();
 
-const { login, refreshToken, sair } = require('../controller/autenticacao.controller')
+const AutenticacaoController = require('../controller/autenticacao.controller');
 
-// rota publica de login
-router.post('/login', login);
+// Rota pública de login
+router.post('/login', AutenticacaoController.login);
 
-// rota de cadastro
-router.post('/cadastrar', cadastrar)
-// rota para sair 
-router.post('/logout', sair);
+// Rota para sair
+router.post('/logout', AutenticacaoController.sair);
 
-// rota usada pelo navegador para atualizar o token 
-router.post('/refress-token', refreshToken);
+// Rota usada pelo navegador para atualizar o token
+router.post('/refresh-token', AutenticacaoController.refreshToken);
 
-module.exports = router
+module.exports = router;

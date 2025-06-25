@@ -2,112 +2,113 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 const Aluno = require('../../aluno/models/aluno.model');
-const { where } = require('sequelize');
 
-// Definindo variaveis de ambiente para TEMPO_ACESS_TOKEN e TEMPO_REFRESH_TOKEN
+dotenv.config();
+
 const tempo_acess_token = process.env.TEMPO_ACESS_TOKEN;
 const tempo_refresh_token = process.env.TEMPO_REFRESH_TOKEN;
 
 class AutenticacaoController {
-    // gerar o token 
-    static gerarTokenAcesso(dadosAluno) {
-        return jwt.sign(dadosAluno, process.env.SECRET_KEY, {
-            expiresIn: tempo_acess_token
-        });
-    };
+  static gerarTokenAcesso(dadosAluno) {
+    return jwt.sign(dadosAluno, process.env.SECRET_KEY, {
+      expiresIn: tempo_acess_token
+    });
+  }
 
-    // gerar o refresh token
-    static gerarRefressToken(dadosAluno) {
-        return jwt.sign(dadosAluno, process.env.SECRET_KEY, {
-            expiresIn: tempo_refresh_token
-        });
-    };
+  static gerarRefreshToken(dadosAluno) {
+    return jwt.sign(dadosAluno, process.env.JWT_REFRESH_SECRET, {
+      expiresIn: tempo_refresh_token
+    });
+  }
 
-    static async login(req, res) {
-        try {
-            const { matricula, senha } = req.body;
-            if (!matricula || !senha) {
-                return res.status(400).json({ msg: 'É necessário informar email e senha' })
-            }
+  static async login(req, res) {
+    try {
+      const { matricula, senha } = req.body;
 
-            const aluno = await Aluno.findOne({
-                where: { matricula }
-            })
+      if (!matricula || !senha) {
+        return res.status(400).json({ msg: 'É necessário informar matrícula e senha.' });
+      }
 
-            if (!aluno) {
-                return res.status(401).json({ msg: 'Aluno não encontrado' })
-            }
+      const aluno = await Aluno.findOne({ where: { matricula } });
 
-            const senhaCorreta = await bcrypt.compare(senha, aluno.senha);
-            if (!senhaCorreta) {
-                return res.status(400).json({ msg: 'E-mail ou senha estão incorretos' })
-            }
+      if (!aluno) {
+        return res.status(401).json({ msg: 'Aluno não encontrado' });
+      }
 
-            const dadosAluno = {
-                nome: aluno.nome,
-                papel: 'aluno'
-            }
+      const senhaCorreta = await bcrypt.compare(senha, aluno.senha);
 
-            // gerando os tokens
-            const tokenAcesso = AutenticacaoController.gerarTokenAcesso(dadosAluno);
-            const refreshToken = AutenticacaoController.gerarRefressToken(dadosAluno);
+      if (!senhaCorreta) {
+        return res.status(400).json({ msg: 'Matrícula ou senha incorretos' });
+      }
 
-            res.cookie("refreshToken", refreshToken, {
-                httpOnly: false,
-                secure: process.env.NODE_ENV,
-                sameStrict: 'strict',
-                maxAge: 1 * 24, // 1dia
-            })
+      const dadosAluno = {
+        matricula: aluno.matricula,
+        nome: aluno.nome,
+        papel: 'aluno'
+      };
 
-            res.status(200).json({
-                msg: 'Aluno logado com sucesso',
-                tokenAcesso,
-                nome: usuario.nome,
-                papel: "aluno",
-            });
+      const tokenAcesso = AutenticacaoController.gerarTokenAcesso(dadosAluno);
+      const refreshToken = AutenticacaoController.gerarRefreshToken(dadosAluno);
 
-        } catch (error) {
-            res.status(500).json({ msg: 'Erro interno do servidor. Por favor tente mais tarde.', erro: error.message })
-        }
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 24 * 60 * 60 * 1000 // 1 dia
+      });
+
+      res.status(200).json({
+        msg: 'Aluno logado com sucesso',
+        tokenAcesso,
+        nome: aluno.nome,
+        papel: "aluno"
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        msg: 'Erro interno do servidor',
+        erro: error.message
+      });
+    }
+  }
+
+  static refreshToken(req, res) {
+    const { refreshToken } = req.cookies;
+
+    if (!refreshToken) {
+      return res.status(403).json({ msg: "Refresh token inválido!" });
     }
 
-    // Método para renovar o refresh token
-    static refreshToken(req, res) {
-        const { refreshToken } = req.cookies;
-        if (!refreshToken) {
-            return res.status(403).json({ msg: "Refresh token invalido!" });
-        }
-        jwt.verify(
-            refreshToken,
-            process.env.JWT_REFRESH_SECRET,
-            (erro, usuario) => {
-                if (erro) {
-                    return res.status(403).json({ msg: "Refresh invalido!" });
-                }
-                const dadosAluno = {
-                    matricula: usuario.matricula,
-                    nome: usuario.nome,
-                    papel: "admin",
-                };
-                // gerando o novo token
-                const novoTokenAcesso = this.gerarTokenAcesso(dadosAluno);
-                // atualizando o token antigo para o novo
-                res.status(200).json({ tokenAcesso: novoTokenAcesso });
-            }
-        );
-    }
+    jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET, (erro, usuario) => {
+      if (erro) {
+        return res.status(403).json({ msg: "Refresh token inválido!" });
+      }
 
-    static async sair(req, res) {
-        try {
-            res.clearCookies("refreshToken", {
-                httpOnly: false,
-                secure: process.env.NODE_ENV,
-                sameStrict: "strict",
-              });
-        } catch (error) {
-            res.status(500).json({msg: 'Erro interno do servidor', erro: error.message})
-        }
+      const dadosAluno = {
+        matricula: usuario.matricula,
+        nome: usuario.nome,
+        papel: "aluno"
+      };
+
+      const novoTokenAcesso = this.gerarTokenAcesso(dadosAluno);
+
+      res.status(200).json({ tokenAcesso: novoTokenAcesso });
+    });
+  }
+
+  static async sair(req, res) {
+    try {
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict"
+      });
+
+      res.status(200).json({ msg: "Logout realizado com sucesso" });
+    } catch (error) {
+      res.status(500).json({ msg: 'Erro interno ao sair', erro: error.message });
     }
+  }
 }
 
 module.exports = AutenticacaoController;
