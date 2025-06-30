@@ -14,8 +14,13 @@ class AlunoController{
 
     static async perfil(req, res){
         try {
-            // const matricula = req.params.matricula;
-            const aluno = await Aluno.findAll();
+            const {matricula }= req.usuario;
+            const aluno = await Aluno.findOne(
+                {where: {
+                    matricula
+                },
+                attributes: ['nome', 'email', 'matricula']} //retornar só esses atributos
+            );
             if(!aluno){
                 return res.status(401).json({msg: 'Não existe aluno cadastrado'})
             }
